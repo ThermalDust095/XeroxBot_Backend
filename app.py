@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import escape
 from flask import request
+import json 
 
 
 app = Flask(__name__)
@@ -39,11 +40,8 @@ class Files(db.Model):
         return f'<File id={self.id} path={self.file_path}>'
 
 
-# with app.app_context():
-#     db.create_all()
-#     akhil = User(name="Akhil", usn="1DT21CS011")
-#     db.session.add(akhil)
-#     db.session.commit()
+with app.app_context():
+    db.create_all()
 
 @app.route('/')
 def hello():
@@ -61,14 +59,34 @@ def show_queries(username):
     return data
 
 
-@app.route('/post-user', methods=['GET','POST'])
+@app.route('/post-user', methods=['POST'])
 def post_user():
     
     if request.method == "POST":
-        print(request)
+        data = json.loads(request.data)
+        print(data)
 
-    return 'users'
+        user = User(name=data["name"], usn=data["usn"].upper())
+        db.session.add(user)
+        db.session.commit()
 
+    return json.dumps({'success':True}), 200, {'ContentType':'application/json'} 
+
+
+@app.route('/post-order/<usn>', methods=['POST'])
+def post_order(usn):
+
+    if request.method == "POST":
+        user = User.query.filter_by(usn=usn).first()
+        data = json.loads(request.data)
+
+        print(data)
+
+        order = Orders(order_status="RECIEVED",user=user)
+        db.session.add(order)
+        db.session.commit()
+
+    return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
 
 print("done!!!")
 
