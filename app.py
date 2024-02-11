@@ -47,14 +47,29 @@ with app.app_context():
 def hello():
     return 'hello'
 
-@app.route('/user/<username>')
-def show_queries(username):
+@app.route('/user/<usn>')
+def show_queries(usn):
     data = {}
-    user = User.query.filter_by(name=username).first()
+    user = User.query.filter_by(usn=usn.upper()).first()
 
     data["id"] = user.id
     data["name"] = user.name
     data["usn"] = user.usn
+    data["orders"] = []
+    for order in user.orders:
+        data["orders"].append(order.id)
+
+    return data
+
+
+@app.route('/order/<order_id>')
+def show_order(order_id):
+    data = {}
+    order = Orders.query.filter_by(id=order_id).first()
+
+    data["id"] = order.id
+    data["order_status"] = order.order_status
+    data["user"] = order.user.usn
 
     return data
 
@@ -88,6 +103,20 @@ def post_order(usn):
 
     return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
 
-print("done!!!")
+
+@app.route('/update-order-status', methods=['POST'])
+def update_order():
+    if request.method == "POST":
+        data = json.loads(request.data)
+
+        order_id = data["order_id"]
+        order = Orders.query.filter_by(id=order_id).first()
+        order.order_status = data["order_status"]
+
+        print(order.id)
+        print(order.order_status)
+        db.session.commit()
+
+    return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
 
 app.run(port=5000, debug=True)
