@@ -28,7 +28,7 @@ $("form").submit(function(e){
     formData.append('file', file)
     formData.append('desc', $("#desc-input").val())
 
-    fetch("http://127.0.0.1:5000/upload-file/1dt21cs011",{
+    fetch("http://127.0.0.1:5000/upload-file/1001",{
         method: "POST",
         body: formData
     })

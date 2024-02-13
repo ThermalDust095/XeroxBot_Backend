@@ -28,7 +28,7 @@ def randomize_filename(filname):
     file_ext[0] = ''.join(random.choices(string.ascii_uppercase +
                              string.digits, k=12))
     
-    return '.'.join(file_ext)
+    return '.'.join(file_ext), file_ext[1]
 
 
 db =SQLAlchemy(app)
@@ -96,6 +96,10 @@ def show_order(order_id):
     data["order_status"] = order.order_status
     data["user"] = order.user.usn
     data["name"] = order.user.name
+    data["files"]= []
+
+    for file in order.files:
+        data["files"].append(file.file_path)
 
     return data
 
@@ -107,9 +111,12 @@ def post_user():
         data = json.loads(request.data)
         print(data)
 
-        user = User(name=data["name"], usn=data["usn"].upper())
-        db.session.add(user)
-        db.session.commit()
+        check_user = User.query.filter_by(usn=data["usn"]).first()
+
+        if check_user == None:
+            user = User(name=data["name"], usn=data["usn"].upper())
+            db.session.add(user)
+            db.session.commit() 
 
     return json.dumps({'success':True}), 200, {'ContentType':'application/json'} 
 
@@ -127,8 +134,18 @@ def post_order(usn):
         db.session.add(order)
         db.session.commit()
 
-    return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
+    return json.dumps({"order_id": order.id}), 200, {'ContentType':'application/json'}
 
+
+@app.route("/pending-orders")
+def get_pending_orders():
+    orders = Orders.query.filter_by(order_status="RECIEVED")
+    data = []
+
+    for order in orders:
+        data.append(order.id)
+
+    return {"orders" : data}
 
 @app.route('/update-order-status', methods=['POST'])
 def update_order():
@@ -160,7 +177,7 @@ def upload_file(order_id):
         print(desc)
         print(file.filename)
 
-        randomized_filename = randomize_filename(file.filename)
+        randomized_filename, file_ext = randomize_filename(file.filename)
         # print(randomized_filename)
         print(order_id)
 
@@ -170,9 +187,13 @@ def upload_file(order_id):
             return redirect(request.url)
 
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-            return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], randomized_filename))
+            order = Orders.query.filter_by(id=order_id).first()
+            file = Files(file_path=randomized_filename, file_type=file_ext, desc=desc, orders=order)
+            db.session.add(file)
+            db.session.commit()
+
+            return json.dumps({"file_path": file.file_path}), 200, {'ContentType':'application/json'}
 
         return 200
     
