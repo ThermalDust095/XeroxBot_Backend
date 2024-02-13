@@ -1,13 +1,35 @@
-from flask import Flask
+from flask import Flask, flash, request, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import escape
 from flask import request
+from werkzeug.utils import secure_filename
 import json 
+import os
+import random
+import string
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:Root-123@localhost/xerox"
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:root@localhost/xerox"
 app.config["SQLALCHEMY_TRACK_NOTIFICATIONS"] = False
+
+UPLOAD_FOLDER = './files'
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'docx'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def randomize_filename(filname):
+    file_ext= filname.split(".")
+    file_ext[0] = ''.join(random.choices(string.ascii_uppercase +
+                             string.digits, k=12))
+    
+    return '.'.join(file_ext)
+
 
 db =SQLAlchemy(app)
 
@@ -50,7 +72,10 @@ def hello():
 @app.route('/user/<usn>')
 def show_queries(usn):
     data = {}
-    user = User.query.filter_by(usn=usn.upper()).first()
+    user = User.query.filter_by(usn=usn.upper()).first()    
+
+    if user == None:
+        return "user_not_found"
 
     data["id"] = user.id
     data["name"] = user.name
@@ -70,6 +95,7 @@ def show_order(order_id):
     data["id"] = order.id
     data["order_status"] = order.order_status
     data["user"] = order.user.usn
+    data["name"] = order.user.name
 
     return data
 
@@ -118,5 +144,53 @@ def update_order():
         db.session.commit()
 
     return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
+
+
+@app.route('/upload-file/<order_id>', methods=["GET","POST"])
+def upload_file(order_id):
+    if request.method == "POST":
+        print(request.files)
+
+        if 'file' not in request.files:
+            flash("No file part")
+            return redirect(request.url)
+        
+        file = request.files['file']
+        desc = request.form["desc"]
+        print(desc)
+        print(file.filename)
+
+        randomized_filename = randomize_filename(file.filename)
+        # print(randomized_filename)
+        print(order_id)
+
+
+        if file.filename == '':
+            flash("No file selected")
+            return redirect(request.url)
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+            return json.dumps({'success':True}), 200, {'ContentType':'application/json'}
+
+        return 200
+    
+    
+    return '''
+    <!doctype html>
+    <title>Upload new File</title>
+    <h1>Upload new File</h1>
+    <form method=post enctype=multipart/form-data>
+      <input type=file name=file>
+      <input type=submit value=Upload>
+    </form>
+    '''
+
+
+
+@app.route('/download/<name>')
+def download_file(name):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], name)
 
 app.run(port=5000, debug=True)
