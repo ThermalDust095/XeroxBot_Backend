@@ -1,4 +1,5 @@
 from flask import Flask, flash, request, redirect, url_for, send_from_directory
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import escape
 from flask import request
@@ -10,6 +11,7 @@ import string
 
 
 app = Flask(__name__)
+CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:root@localhost/xerox"
 app.config["SQLALCHEMY_TRACK_NOTIFICATIONS"] = False
 
@@ -103,10 +105,22 @@ def show_order(order_id):
 
     return data
 
+@app.route('/file/<file_path>')
+def show_file(file_path):
+    data = {}
+    file = Files.query.filter_by(file_path=file_path).first()
 
+    data["file_path"] = file.file_path
+    data["type"] = file.file_type
+    data["desc"] = file.desc
+
+    return data
+
+        
 @app.route('/post-user', methods=['POST'])
 def post_user():
-    
+    print(request)
+
     if request.method == "POST":
         data = json.loads(request.data)
         print(data)
@@ -125,10 +139,7 @@ def post_user():
 def post_order(usn):
 
     if request.method == "POST":
-        user = User.query.filter_by(usn=usn).first()
-        data = json.loads(request.data)
-
-        print(data)
+        user = User.query.filter_by(usn=usn).first()    
 
         order = Orders(order_status="RECIEVED",user=user)
         db.session.add(order)
@@ -143,7 +154,11 @@ def get_pending_orders():
     data = []
 
     for order in orders:
-        data.append(order.id)
+        file_data = {"id":order.id , "name" : order.user.name , "status" : order.order_status , "user": order.user.usn}
+        for file in order.files:
+            file_data["file"] = file.file_path
+            file_data["desc"] = file.desc
+        data.append(file_data)
 
     return {"orders" : data}
 
@@ -214,4 +229,4 @@ def upload_file(order_id):
 def download_file(name):
     return send_from_directory(app.config["UPLOAD_FOLDER"], name)
 
-app.run(port=5000, debug=True)
+app.run(port=5000, debug=True)  
