@@ -1,4 +1,4 @@
-from flask import Flask, flash, request, redirect, url_for, send_from_directory
+from flask import Flask, flash, request, redirect, url_for, send_from_directory, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import escape
@@ -10,7 +10,7 @@ import random
 import string
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="./public")
 CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:root@localhost/xerox"
 app.config["SQLALCHEMY_TRACK_NOTIFICATIONS"] = False
@@ -69,7 +69,7 @@ with app.app_context():
 
 @app.route('/')
 def hello():
-    return 'hello'
+    return render_template("index.html")
 
 @app.route('/user/<usn>')
 def show_queries(usn):
