@@ -8,11 +8,13 @@ import json
 import os
 import random
 import string
+from flask_bcrypt import Bcrypt 
 
 
 app = Flask(__name__, static_folder="./public")
 CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:root@localhost/xerox"
+bcrypt = Bcrypt(app) 
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql://root:Root-123@localhost/xerox"
 app.config["SQLALCHEMY_TRACK_NOTIFICATIONS"] = False
 
 UPLOAD_FOLDER = './files'
@@ -34,6 +36,16 @@ def randomize_filename(filname):
 
 
 db =SQLAlchemy(app)
+
+
+class User_Password(db.Model):
+    id = db.Column(db.Integer)
+    name = db.Column(db.String(20))
+    email = db.Column(db.String(30))
+    usn = db.Column(db.String(20), primary_key=True)
+    username = db.Column(db.String(20))
+    password = db.Column(db.String(150))
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key = True)
@@ -63,13 +75,21 @@ class Files(db.Model):
     def __repr__(self):
         return f'<File id={self.id} path={self.file_path}>'
 
+class Client_Password(db.Model):
+    username = db.Column(db.String(20), primary_key=True)
+    password = db.Column(db.String(20))
+
 
 with app.app_context():
     db.create_all()
+    # admin = Client_Password(username="admin", password="root")
+    # db.session.add(admin)
+    # db.session.commit()
 
 @app.route('/')
 def hello():
-    return render_template("index.html")
+    p = Client_Password.query.filter_by(username="admin").first()
+    return render_template("index.html", password = p.password) 
 
 @app.route('/user/<usn>')
 def show_queries(usn):
@@ -152,6 +172,7 @@ def post_order(usn):
 def get_pending_orders():
     orders = Orders.query.filter_by(order_status="RECIEVED")
     data = []
+    count = Orders.query.filter_by(order_status = "RECIEVED").count()
 
     for order in orders:
         file_data = {"id":order.id , "name" : order.user.name , "status" : order.order_status , "user": order.user.usn}
@@ -160,7 +181,7 @@ def get_pending_orders():
             file_data["desc"] = file.desc
         data.append(file_data)
 
-    return {"orders" : data}
+    return {"orders" : data, "count": count}
 
 @app.route('/update-order-status', methods=['POST'])
 def update_order():
@@ -228,5 +249,38 @@ def upload_file(order_id):
 @app.route('/download/<name>')
 def download_file(name):
     return send_from_directory(app.config["UPLOAD_FOLDER"], name)
+
+
+
+
+@app.route("/create-acc", methods = ["POST"]) 
+def create_acc():
+    if request.method == "POST":
+        data = json.loads(request.data)
+        print(data)
+
+        password_hash = bcrypt.generate_password_hash(password=data["password"]).decode('utf-8')
+        entry = User_Password(name=data["name"], email=data["email"], usn=data["usn"].upper(), username=data["username"], password= password_hash)
+        db.session.add(entry)
+        db.session.commit()
+
+
+        return json.dumps({'success':True}), 200, {'ContentType':'application/json'}  
+
+
+@app.route("/auth-user", methods = ["POST"])
+def authenticate():
+    if request.method == "POST":
+        data = json.loads(request.data)
+
+        p = User_Password.query.filter_by(usn=data["usn"].upper()).first()
+
+        if p == None:
+            return {"Valid": "NotFound"}
+        
+        isValid = is_valid = bcrypt.check_password_hash(p.password, data["password"])
+        print(isValid)
+
+        return {"Valid" : isValid}
 
 app.run(port=5000, debug=True)  

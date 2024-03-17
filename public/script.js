@@ -2,6 +2,7 @@ $(document).ready(async () => {
   console.log("ready..");
   let res = await fetch("http://127.0.0.1:5000/pending-orders");
   let orders = await res.json();
+  $("#count-h").html(`Order Count: ${orders.count}`)
   $(".box-container").remove();
   console.log(orders.orders);
   orders.orders.map((order) => create_div(order));
@@ -15,6 +16,7 @@ $(document).ready(async () => {
       $(".box-container").remove();
       console.log(orders.orders);
       orders.orders.map((order) => create_div(order));
+      $("#count-h").html(`Order Count: ${orders.count}`)
     }
   }, 1000);
 });
